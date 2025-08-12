@@ -1,0 +1,189 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "command": "python -m pytest"
+      },
+      "id": "2",
+      "name": "Executar Testes",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"stdout\"]}}",
+              "operation": "contains",
+              "value2": "FAILED"
+            }
+          ]
+        }
+      },
+      "id": "3",
+      "name": "Testes Falharam?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://localhost:11434/api/generate",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "model",
+              "value": "llama2"
+            },
+            {
+              "name": "prompt",
+              "value": "Corrija o seguinte erro nos testes: {{$json[\"stdout\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "4",
+      "name": "Solicitar ao Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [840, 200]
+    },
+    {
+      "parameters": {
+        "command": "python auto_aprimoramento.py"
+      },
+      "id": "5",
+      "name": "Aplicar Sugestão",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1040, 200]
+    },
+    {
+      "parameters": {
+        "command": "python -m pytest"
+      },
+      "id": "6",
+      "name": "Testar Novamente",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1240, 200]
+    },
+    {
+      "parameters": {
+        "command": "git add ."
+      },
+      "id": "7",
+      "name": "Git Add",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1440, 200]
+    },
+    {
+      "parameters": {
+        "command": "git commit -m \"Auto-aprimoramento pelo AI agent\""
+      },
+      "id": "8",
+      "name": "Git Commit",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1640, 200]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Executar Testes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executar Testes": {
+      "main": [
+        [
+          {
+            "node": "Testes Falharam?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testes Falharam?": {
+      "main": [
+        [
+          {
+            "node": "Solicitar ao Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Git Add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solicitar ao Ollama": {
+      "main": [
+        [
+          {
+            "node": "Aplicar Sugestão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aplicar Sugestão": {
+      "main": [
+        [
+          {
+            "node": "Testar Novamente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testar Novamente": {
+      "main": [
+        [
+          {
+            "node": "Git Add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Git Add": {
+      "main": [
+        [
+          {
+            "node": "Git Commit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
