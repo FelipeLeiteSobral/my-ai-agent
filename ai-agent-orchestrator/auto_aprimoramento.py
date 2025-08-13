@@ -2,6 +2,7 @@ import subprocess
 import requests
 import sys
 import os
+import datetime
 
 def executar_testes():
     print("Executando todos os testes do projeto...")
@@ -94,6 +95,86 @@ def commit_alteracoes():
     print("Commit realizado.")
 
 def ciclo_auto_aprimoramento():
+    # Função para gerar relatório
+    def gerar_relatorio(ideia, plano, sugestao, resultado_testes, sucesso):
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        relatorio_path = f"relatorio_autoaprimoramento_{timestamp}.txt"
+        with open(relatorio_path, "w", encoding="utf-8") as f:
+            f.write(f"Ideia implementada:\n{ideia}\n\n")
+            f.write(f"Plano de implementação:\n{plano}\n\n")
+            f.write(f"Sugestão aplicada:\n{sugestao}\n\n")
+            f.write(f"Resultado dos testes:\n{resultado_testes}\n\n")
+            f.write(f"Sucesso: {sucesso}\n")
+        print(f"Relatório gerado: {relatorio_path}")
+    # Implementação automática de ideias sugeridas
+    if os.path.exists("sugestoes_ideias_ollama.txt"):
+        with open("sugestoes_ideias_ollama.txt", "r", encoding="utf-8") as f:
+            ideias = [i.strip() for i in f.read().split('\n') if i.strip()]
+        if ideias:
+            print("Solicitando ao Ollama a priorização das ideias...")
+            prompt_priorizacao = (
+                "Considere as ideias a seguir e ranqueie por impacto, facilidade de implementação e alinhamento com o projeto. Retorne apenas as 3 melhores ideias:\n" + '\n'.join(ideias)
+            )
+            ideias_priorizadas = solicitar_sugestao_ollama(prompt_priorizacao)
+            if ideias_priorizadas:
+                ideias_selecionadas = [i.strip() for i in ideias_priorizadas.split('\n') if i.strip()][:3]
+                print(f"Ideias priorizadas: {ideias_selecionadas}")
+                for ideia in ideias_selecionadas:
+                    print(f"Solicitando plano de implementação ao Ollama para a ideia: {ideia}")
+                    plano_prompt = f"Detalhe um plano de implementação para a seguinte ideia no contexto do projeto: {ideia}. Inclua arquivos, funções, testes e integração."
+                    plano = solicitar_sugestao_ollama(plano_prompt)
+                    if plano:
+                        print("Plano recebido. Solicitando código/patch ao Ollama...")
+                        codigo_prompt = f"Implemente o plano a seguir no projeto, gerando patch unified diff ou instruções claras:\n{plano}"
+                        sugestao_codigo = solicitar_sugestao_ollama(codigo_prompt)
+                        if sugestao_codigo:
+                            aplicar_sugestao(sugestao_codigo)
+                            print("Código/patch aplicado. Validando com testes...")
+                            resultado_testes, sucesso = executar_testes()
+                            sucesso_final = ("FAILED" not in resultado_testes and "error" not in resultado_testes.lower() and sucesso == 0)
+                            if sucesso_final:
+                                print("Ideia implementada com sucesso. Realizando commit.")
+                                commit_alteracoes()
+                            else:
+                                print("Falha ao implementar ideia. Realizando rollback.")
+                                for file in os.listdir():
+                                    if file.endswith(".bak"):
+                                        original = file[:-4]
+                                        os.replace(file, original)
+                                        print(f"Arquivo restaurado: {original}")
+                            gerar_relatorio(ideia, plano, sugestao_codigo, resultado_testes, sucesso_final)
+                        else:
+                            print("Ollama não gerou código/patch para a ideia.")
+                    else:
+                        print("Ollama não gerou plano para a ideia.")
+            else:
+                print("Ollama não respondeu à priorização das ideias.")
+        else:
+            print("Nenhuma ideia encontrada para priorização.")
+    # Autoavaliação do ciclo
+    print("Solicitando ao Ollama uma autoavaliação do ciclo de autoaprimoramento...")
+    prompt_avaliacao = (
+        "Considere o ciclo de autoaprimoramento realizado neste projeto. Avalie o processo, sugira melhorias para o agente e indique como ele pode se tornar mais eficiente e seguro."
+    )
+    avaliacao = solicitar_sugestao_ollama(prompt_avaliacao)
+    if avaliacao:
+        with open("avaliacao_ciclo_ollama.txt", "w", encoding="utf-8") as f:
+            f.write(avaliacao)
+        print("Autoavaliação do ciclo salva em avaliacao_ciclo_ollama.txt.")
+    else:
+        print("Ollama não respondeu à autoavaliação do ciclo.")
+    # Geração de prompt para novas ideias/acoplamentos
+    print("Solicitando ao Ollama ideias de novas funcionalidades ou integrações para o sistema...")
+    prompt_ideias = (
+        "Considere o código e contexto deste projeto. Sugira ideias de novas funcionalidades, integrações ou módulos que poderiam ser acoplados ao sistema para torná-lo mais útil, inteligente ou autônomo. Liste sugestões e explique como poderiam ser implementadas."
+    )
+    sugestao_ideias = solicitar_sugestao_ollama(prompt_ideias)
+    if sugestao_ideias:
+        with open("sugestoes_ideias_ollama.txt", "w", encoding="utf-8") as f:
+            f.write(sugestao_ideias)
+        print("Sugestões de ideias salvas em sugestoes_ideias_ollama.txt.")
+    else:
+        print("Ollama não respondeu sugestões de ideias.")
     # Rollback automático em caso de falha
     stdout, returncode = executar_testes()
     falha = ("FAILED" in stdout or "error" in stdout.lower() or returncode != 0)
